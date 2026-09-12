@@ -334,6 +334,19 @@ async def run_agent_task(
         yield {run_button_comp: gr.update(interactive=True)}
         return
 
+    # This app runs one shared browser session for everyone connected. Starting a
+    # second task while one is still in flight (or mid-teardown from Stop/Clear)
+    # corrupts that shared state and crashes with "'NoneType' object has no
+    # attribute 'state'". Refuse instead of racing.
+    existing_task = getattr(webui_manager, "bu_current_task", None)
+    if existing_task and not existing_task.done():
+        gr.Warning(
+            "An agent task is already running (shared browser session). "
+            "Wait for it to finish, or click Stop, before submitting a new one."
+        )
+        yield {run_button_comp: gr.update(interactive=True)}
+        return
+
     # Set running state indirectly via _current_task
     webui_manager.bu_chat_history.append({"role": "user", "content": task})
 
