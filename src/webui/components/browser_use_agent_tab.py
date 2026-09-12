@@ -158,11 +158,11 @@ async def _handle_new_step(
             if (
                     isinstance(screenshot_data, str) and len(screenshot_data) > 100
             ):  # Arbitrary length check
-                # *** UPDATED STYLE: Removed centering, adjusted width ***
-                img_tag = f'<img src="data:image/jpeg;base64,{screenshot_data}" alt="Step {step_num} Screenshot" style="max-width: 800px; max-height: 600px; object-fit:contain;" />'
-                screenshot_html = (
-                        img_tag + "<br/>"
-                )  # Use <br/> for line break after inline-block image
+                img_tag = (
+                    f'<img src="data:image/jpeg;base64,{screenshot_data}" alt="Step {step_num} Screenshot" '
+                    f'style="width:100%; max-width:900px; border-radius:10px; border:1px solid #059669; display:block; margin:6px 0;" />'
+                )
+                screenshot_html = img_tag
             else:
                 logger.warning(
                     f"Screenshot for step {step_num} seems invalid (type: {type(screenshot_data)}, len: {len(screenshot_data) if isinstance(screenshot_data, str) else 'N/A'})."
@@ -178,13 +178,27 @@ async def _handle_new_step(
     else:
         logger.debug(f"No screenshot available for step {step_num}.")
 
-    # --- Format Agent Output ---
+    # --- Plain-English status line (what the agent is doing, no JSON needed) ---
+    next_goal = ""
+    try:
+        next_goal = getattr(output.current_state, "next_goal", "") or ""
+    except Exception:
+        pass
+    status_line = f"🎯 {next_goal}" if next_goal else ""
+
+    # --- Format Agent Output (kept, but collapsed by default) ---
     formatted_output = _format_agent_output(output)  # Use the updated function
+    details_block = (
+        f"<details><summary>▸ step details (raw JSON)</summary>{formatted_output}</details>"
+        if formatted_output
+        else ""
+    )
 
     # --- Combine and Append to Chat ---
     step_header = f"--- **Step {step_num}** ---"
-    # Combine header, image (with line break), and JSON block
-    final_content = step_header + "<br/>" + screenshot_html + formatted_output
+    final_content = (
+        step_header + "<br/>" + status_line + "<br/>" + screenshot_html + details_block
+    )
 
     chat_message = {
         "role": "assistant",
@@ -202,19 +216,33 @@ def _handle_done(webui_manager: WebuiManager, history: AgentHistoryList):
     logger.info(
         f"Agent task finished. Duration: {history.total_duration_seconds():.2f}s, Tokens: {history.total_input_tokens()}"
     )
-    final_summary = "**Task Completed**\n"
-    final_summary += f"- Duration: {history.total_duration_seconds():.2f} seconds\n"
-    final_summary += f"- Total Input Tokens: {history.total_input_tokens()}\n"  # Or total tokens if available
+    errors = history.errors()
+    ok = not (errors and any(errors))
+    status_color = "#059669" if ok else "#dc2626"
+    status_label = "Success" if ok else "Failed"
+
+    stats_row = (
+        f'<div style="display:flex; gap:10px; margin:8px 0;">'
+        f'<div style="flex:1; background:#022c22; border:1px solid {status_color}; border-radius:8px; padding:10px; text-align:center;">'
+        f'<div style="color:#a7f3d0; font-size:12px;">STEPS</div>'
+        f'<div style="color:#ecfdf5; font-size:18px; font-weight:700;">{len(history.history)}</div></div>'
+        f'<div style="flex:1; background:#022c22; border:1px solid {status_color}; border-radius:8px; padding:10px; text-align:center;">'
+        f'<div style="color:#a7f3d0; font-size:12px;">DURATION</div>'
+        f'<div style="color:#ecfdf5; font-size:18px; font-weight:700;">{history.total_duration_seconds():.1f}s</div></div>'
+        f'<div style="flex:1; background:#022c22; border:1px solid {status_color}; border-radius:8px; padding:10px; text-align:center;">'
+        f'<div style="color:#a7f3d0; font-size:12px;">INPUT TOKENS</div>'
+        f'<div style="color:#ecfdf5; font-size:18px; font-weight:700;">{history.total_input_tokens()}</div></div>'
+        f'</div>'
+    )
+
+    final_summary = f"**Task {status_label}**<br/>{stats_row}"
 
     final_result = history.final_result()
     if final_result:
-        final_summary += f"- Final Result: {final_result}\n"
+        final_summary += f"\n- Final Result: {final_result}\n"
 
-    errors = history.errors()
-    if errors and any(errors):
+    if not ok:
         final_summary += f"- **Errors:**\n```\n{errors}\n```\n"
-    else:
-        final_summary += "- Status: Success\n"
 
     webui_manager.bu_chat_history.append(
         {"role": "assistant", "content": final_summary}

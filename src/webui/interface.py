@@ -15,15 +15,16 @@ theme_map = {
     "Origin": gr.themes.Origin(),
     "Citrus": gr.themes.Citrus(),
     "Ocean": gr.themes.Ocean(),
-    "Base": gr.themes.Base()
+    "Base": gr.themes.Base(),
+    "Limepipe": gr.themes.Default(primary_hue="emerald", secondary_hue="emerald", neutral_hue="slate"),
 }
 
 
-def create_ui(theme_name="Ocean"):
+def create_ui(theme_name="Limepipe"):
     css = """
     .gradio-container {
-        width: 70vw !important; 
-        max-width: 70% !important; 
+        width: 70vw !important;
+        max-width: 70% !important;
         margin-left: auto !important;
         margin-right: auto !important;
         padding-top: 10px !important;
@@ -31,6 +32,12 @@ def create_ui(theme_name="Ocean"):
     .header-text {
         text-align: center;
         margin-bottom: 20px;
+        padding: 24px 16px;
+        border-radius: 14px;
+        background: linear-gradient(135deg, #064e3b 0%, #047857 100%);
+    }
+    .header-text h1, .header-text h3 {
+        color: #ecfdf5 !important;
     }
     .tab-header-text {
         text-align: center;
